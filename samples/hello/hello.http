@@ -1,2 +1,4 @@
 ### GET request to local server
 GET http://localhost:8080/hello
+
+> {%console.log("hello returns", response.status)%}

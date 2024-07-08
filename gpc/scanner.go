@@ -14,6 +14,9 @@ import (
 // Ignore
 // RequestSeparator Comment
 // Verb URL
+// <empty line?>
+// > {% .... %}
+// > file.js
 
 const spaceChars = " \t\r\n"
 const lineEnds = "\r\n"
@@ -26,9 +29,14 @@ const (
 	tokenRequestSeparator
 	tokenVerb
 	tokenURL
+
+	tokenResponseHandler
+
+	tokenEmbeddedScript
 )
 
 const requestSeparator = "###"
+const responseHandlerStart = ">"
 
 type item struct {
 	tok token
@@ -177,6 +185,14 @@ func lexDetectRequest(s *scanner) stateFn {
 		})
 		s.currentValue.Reset()
 		return lexRequestUrl
+	case responseHandlerStart:
+		s.emitItem(item{
+			tok: tokenResponseHandler,
+			val: "",
+		})
+		s.currentValue.Reset()
+		return lexScript
+		// TODO: it seems like empty line after request has a certain meaning
 	}
 	s.emitError()
 	return nil
@@ -209,6 +225,11 @@ func lexRequestUrl(s *scanner) stateFn {
 		s.currentValue.Reset()
 	}
 	return lexIgnore
+}
+
+// lexScript detects either embedded script or external file
+func lexScript(s *scanner) stateFn {
+	return nil
 }
 
 func (s *scanner) scan() {

@@ -15,25 +15,34 @@ type Player struct {
 }
 
 type execStep struct {
-	step step
+	step step // Definition of step.
 	req  *http.Request
 	res  *http.Response
+	rho  string // The output of response handler.
+}
+
+func (e execStep) ResponseHandlerOutput() string {
+	return e.rho
 }
 
 type Report struct {
 	steps []execStep
 }
 
-func (r *Report) Passed() bool {
+func (r Report) Steps() []execStep {
+	return r.steps
+}
+
+func (r Report) Passed() bool {
 	return true
 }
 
-func (r *Report) LastError() error {
+func (r Report) LastError() error {
 	return nil
 }
 
-func (p *Player) Play() (*Report, error) {
-	report := &Report{}
+func (p *Player) Play() (Report, error) {
+	report := Report{}
 	cl := &http.Client{}
 	for _, step := range p.steps {
 		item := execStep{
@@ -41,7 +50,7 @@ func (p *Player) Play() (*Report, error) {
 		}
 		u, err := url.Parse(step.url)
 		if err != nil {
-			return nil, err
+			return report, err
 		}
 		item.req = &http.Request{
 			Method: step.method,
@@ -49,7 +58,7 @@ func (p *Player) Play() (*Report, error) {
 		}
 		item.res, err = cl.Do(item.req)
 		if err != nil {
-			return nil, err
+			return report, err
 		}
 		report.steps = append(report.steps, item)
 	}

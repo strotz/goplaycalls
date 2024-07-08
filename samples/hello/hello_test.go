@@ -54,7 +54,13 @@ func TestHello(t *testing.T) {
 
 		r, err := p.Play()
 		assert.NoError(t, err)
+
 		assert.True(t, r.Passed())
 		assert.NoError(t, r.LastError())
+
+		steps := r.Steps()
+		require.Len(t, steps, 1)
+
+		assert.Equal(t, "hello returns 200", steps[0].ResponseHandlerOutput())
 	})
 }

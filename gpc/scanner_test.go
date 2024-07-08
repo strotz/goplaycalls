@@ -1,12 +1,19 @@
 package gpc
 
 import (
+	"github.com/stretchr/testify/require"
 	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func assertFunc(t *testing.T, expected any, given any) bool {
+	ep := reflect.ValueOf(expected).Pointer()
+	p := reflect.ValueOf(given).Pointer()
+	return assert.Equal(t, ep, p)
+}
 
 func TestRead(t *testing.T) {
 	t.Run("read empty file", func(t *testing.T) {
@@ -42,6 +49,7 @@ x`)
 		s := newScanner(r)
 		fn := lexIgnore(s)
 		assert.Equal(t, "", s.currentValue.String())
+		assertFunc(t, lexDetectRequest, fn)
 		expected := reflect.ValueOf(lexDetectRequest).Pointer()
 		pointer := reflect.ValueOf(fn).Pointer()
 		assert.Equal(t, expected, pointer)
@@ -135,6 +143,30 @@ but not this one`)
 			tok: tokenRequestSeparator,
 			val: "Make a request",
 		}, s.items[0])
+	})
+
+	t.Run("detect request handler embedded", func(t *testing.T) {
+		r := strings.NewReader(`> {% console.log("hello") %}`)
+		s := newScanner(r)
+		fn := lexDetectRequest(s)
+		assertFunc(t, lexScript, fn)
+		require.Len(t, s.items, 1)
+		assert.Equal(t, item{
+			tok: tokenResponseHandler,
+			val: "",
+		}, s.items[0])
+
+		fn = lexScript(s)
+		assertFunc(t, lexIgnore, fn)
+		require.Len(t, s.items, 2)
+		assert.Equal(t, item{
+			tok: tokenEmbeddedScript,
+			val: "console.log(\"hello\")",
+		}, s.items[1])
+	})
+
+	t.Run("extract embedded script", func(t *testing.T) {
+
 	})
 }
 
