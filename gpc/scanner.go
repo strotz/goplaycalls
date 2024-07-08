@@ -20,6 +20,8 @@ import (
 
 const spaceChars = " \t\r\n"
 const lineEnds = "\r\n"
+const scriptStart = "{%"
+const scriptEnd = "%}"
 
 type token int
 
@@ -33,6 +35,7 @@ const (
 	tokenResponseHandler
 
 	tokenEmbeddedScript
+	tokenScriptFile
 )
 
 const requestSeparator = "###"
@@ -117,8 +120,8 @@ func (s *scanner) accept(fn acceptFn) bool {
 	return false
 }
 
-// ignoreWhiteSpaces accumulates spaces and EOL
-func (s *scanner) ignoreWhiteSpaces() {
+// acceptWhiteSpaces accumulates spaces and EOL
+func (s *scanner) acceptWhiteSpaces() {
 	for {
 		// Collect all white space characters.
 		if !s.accept(func(r rune) bool {
@@ -127,6 +130,11 @@ func (s *scanner) ignoreWhiteSpaces() {
 			break
 		}
 	}
+}
+
+// ignoreWhiteSpaces accumulates spaces and EOL
+func (s *scanner) ignoreWhiteSpaces() {
+	s.acceptWhiteSpaces()
 	s.currentValue.Reset()
 }
 
@@ -229,7 +237,31 @@ func lexRequestUrl(s *scanner) stateFn {
 
 // lexScript detects either embedded script or external file
 func lexScript(s *scanner) stateFn {
-	return nil
+	s.ignoreWhiteSpaces()
+	s.acceptWord()
+	if !strings.HasPrefix(s.currentValue.String(), scriptStart) {
+		// Does not look like embedded script
+		s.emitItem(item{
+			tok: tokenScriptFile,
+			val: s.currentValue.String(),
+		})
+		s.currentValue.Reset()
+		return lexIgnore
+	}
+	for {
+		s.acceptWhiteSpaces()
+		s.acceptWord()
+		if strings.HasSuffix(s.currentValue.String(), scriptEnd) {
+			s.emitItem(item{
+				tok: tokenEmbeddedScript,
+				val: s.currentValue.String(),
+			})
+			return lexIgnore
+		}
+		if s.peak() == eof {
+			return nil
+		}
+	}
 }
 
 func (s *scanner) scan() {

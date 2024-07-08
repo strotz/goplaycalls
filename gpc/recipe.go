@@ -6,10 +6,16 @@ import (
 	"io"
 )
 
+type script struct {
+	file    string
+	content string
+}
+
 type step struct {
-	name   string
-	method string
-	url    string
+	name            string
+	method          string
+	url             string
+	responseHandler *script
 }
 
 func (s step) valid() bool {
@@ -49,6 +55,13 @@ func makeRecipe(reader io.Reader) ([]step, error) {
 			} else {
 				current.url = item.val
 			}
+		case tokenResponseHandler:
+			if !current.valid() {
+				return nil, errors.New("failed to declare response handler for invalid request")
+			}
+			current.responseHandler = &script{}
+		case tokenScriptFile:
+
 		default:
 			return nil, fmt.Errorf("unexpected token: %v - %v", item.tok, item.val)
 		}

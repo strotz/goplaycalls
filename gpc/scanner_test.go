@@ -161,12 +161,28 @@ but not this one`)
 		require.Len(t, s.items, 2)
 		assert.Equal(t, item{
 			tok: tokenEmbeddedScript,
-			val: "console.log(\"hello\")",
+			val: "{% console.log(\"hello\") %}",
 		}, s.items[1])
 	})
 
 	t.Run("extract embedded script", func(t *testing.T) {
+		r := strings.NewReader(`> index.js  `)
+		s := newScanner(r)
+		fn := lexDetectRequest(s)
+		assertFunc(t, lexScript, fn)
+		require.Len(t, s.items, 1)
+		assert.Equal(t, item{
+			tok: tokenResponseHandler,
+			val: "",
+		}, s.items[0])
 
+		fn = lexScript(s)
+		assertFunc(t, lexIgnore, fn)
+		require.Len(t, s.items, 2)
+		assert.Equal(t, item{
+			tok: tokenScriptFile,
+			val: "index.js",
+		}, s.items[1])
 	})
 }
 
@@ -196,6 +212,40 @@ GET https://example.com
 			{
 				tok: tokenURL,
 				val: "https://example.com",
+			},
+		}
+		assert.EqualValues(t, expected, s.items)
+	})
+
+	t.Run("scan get with request handler", func(t *testing.T) {
+		r := strings.NewReader(`### Get operation
+GET https://example.com
+
+> index.js
+
+		`)
+		s := newScanner(r)
+		s.scan()
+		expected := []item{
+			{
+				tok: tokenRequestSeparator,
+				val: "Get operation",
+			},
+			{
+				tok: tokenVerb,
+				val: "GET",
+			},
+			{
+				tok: tokenURL,
+				val: "https://example.com",
+			},
+			{
+				tok: tokenResponseHandler,
+				val: "",
+			},
+			{
+				tok: tokenScriptFile,
+				val: "index.js",
 			},
 		}
 		assert.EqualValues(t, expected, s.items)
