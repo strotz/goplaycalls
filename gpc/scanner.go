@@ -14,9 +14,14 @@ import (
 // Ignore
 // RequestSeparator Comment
 // Verb URL
+// <empty line?>
+// > {% .... %}
+// > file.js
 
 const spaceChars = " \t\r\n"
 const lineEnds = "\r\n"
+const scriptStart = "{%"
+const scriptEnd = "%}"
 
 type token int
 
@@ -26,9 +31,15 @@ const (
 	tokenRequestSeparator
 	tokenVerb
 	tokenURL
+
+	tokenResponseHandler
+
+	tokenEmbeddedScript
+	tokenScriptFile
 )
 
 const requestSeparator = "###"
+const responseHandlerStart = ">"
 
 type item struct {
 	tok token
@@ -109,8 +120,8 @@ func (s *scanner) accept(fn acceptFn) bool {
 	return false
 }
 
-// ignoreWhiteSpaces accumulates spaces and EOL
-func (s *scanner) ignoreWhiteSpaces() {
+// acceptWhiteSpaces accumulates spaces and EOL
+func (s *scanner) acceptWhiteSpaces() {
 	for {
 		// Collect all white space characters.
 		if !s.accept(func(r rune) bool {
@@ -119,6 +130,11 @@ func (s *scanner) ignoreWhiteSpaces() {
 			break
 		}
 	}
+}
+
+// ignoreWhiteSpaces accumulates spaces and EOL
+func (s *scanner) ignoreWhiteSpaces() {
+	s.acceptWhiteSpaces()
 	s.currentValue.Reset()
 }
 
@@ -177,6 +193,14 @@ func lexDetectRequest(s *scanner) stateFn {
 		})
 		s.currentValue.Reset()
 		return lexRequestUrl
+	case responseHandlerStart:
+		s.emitItem(item{
+			tok: tokenResponseHandler,
+			val: "",
+		})
+		s.currentValue.Reset()
+		return lexScript
+		// TODO: it seems like empty line after request has a certain meaning
 	}
 	s.emitError()
 	return nil
@@ -209,6 +233,35 @@ func lexRequestUrl(s *scanner) stateFn {
 		s.currentValue.Reset()
 	}
 	return lexIgnore
+}
+
+// lexScript detects either embedded script or external file
+func lexScript(s *scanner) stateFn {
+	s.ignoreWhiteSpaces()
+	s.acceptWord()
+	if !strings.HasPrefix(s.currentValue.String(), scriptStart) {
+		// Does not look like embedded script
+		s.emitItem(item{
+			tok: tokenScriptFile,
+			val: s.currentValue.String(),
+		})
+		s.currentValue.Reset()
+		return lexIgnore
+	}
+	for {
+		s.acceptWhiteSpaces()
+		s.acceptWord()
+		if strings.HasSuffix(s.currentValue.String(), scriptEnd) {
+			s.emitItem(item{
+				tok: tokenEmbeddedScript,
+				val: s.currentValue.String(),
+			})
+			return lexIgnore
+		}
+		if s.peak() == eof {
+			return nil
+		}
+	}
 }
 
 func (s *scanner) scan() {

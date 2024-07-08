@@ -4,12 +4,19 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 )
 
+type script struct {
+	file    string
+	content string
+}
+
 type step struct {
-	name   string
-	method string
-	url    string
+	name            string
+	method          string
+	url             string
+	responseHandler *script
 }
 
 func (s step) valid() bool {
@@ -25,36 +32,60 @@ func makeRecipe(reader io.Reader) ([]step, error) {
 		}
 	}
 	res := []step{}
-	current := step{}
+	currentStep := step{}
+	var currentHandler *script = nil
 	for _, item := range s.items {
 		switch item.tok {
 		case tokenRequestSeparator:
-			current.name = item.val
-			if current.valid() {
-				res = append(res, current)
-				current = step{}
+			currentStep.name = item.val
+			if currentStep.valid() {
+				res = append(res, currentStep)
+				currentStep = step{}
+				currentHandler = nil
 			}
 		case tokenVerb:
-			if current.method != "" {
+			if currentStep.method != "" {
 				return nil, errors.New("request separator is missing (verb)")
 			} else {
-				current.method = item.val
+				currentStep.method = item.val
 			}
 		case tokenURL:
-			if current.method == "" {
+			if currentStep.method == "" {
 				return nil, errors.New("method is missing")
 			}
-			if current.url != "" {
+			if currentStep.url != "" {
 				return nil, errors.New("request separator is missing (url)")
 			} else {
-				current.url = item.val
+				currentStep.url = item.val
 			}
+		case tokenResponseHandler:
+			if !currentStep.valid() {
+				return nil, errors.New("failed to declare response handler for invalid request")
+			}
+			currentStep.responseHandler = &script{}
+			currentHandler = currentStep.responseHandler
+		case tokenScriptFile:
+			if currentHandler == nil {
+				return nil, errors.New("missing handler context")
+			}
+			// TODO: is it a good time to check file?
+			currentHandler.file = item.val
+		case tokenEmbeddedScript:
+			if currentHandler == nil {
+				return nil, errors.New("missing handler context")
+			}
+			if !strings.HasPrefix(item.val, scriptStart) || !strings.HasSuffix(item.val, scriptEnd) {
+				return nil, errors.New("invalid script")
+			}
+			currentHandler.content = strings.TrimSuffix(strings.TrimPrefix(item.val, scriptStart), scriptEnd)
 		default:
 			return nil, fmt.Errorf("unexpected token: %v - %v", item.tok, item.val)
 		}
 	}
-	if current.valid() {
-		res = append(res, current)
+	if currentStep.valid() {
+		res = append(res, currentStep)
+		currentStep = step{}
+		currentHandler = nil
 	}
 	return res, nil
 }

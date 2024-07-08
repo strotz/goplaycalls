@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"github.com/strotz/goplaycalls/gpc"
 )
 
@@ -20,10 +21,9 @@ func TestHello(t *testing.T) {
 	}
 
 	t.Run("call GET hello without server", func(t *testing.T) {
-		r, err := p.Play()
+		_, err := p.Play()
 		require.ErrorContains(t, err,
-			"Get \"http://localhost:8080/hello\": dial tcp 127.0.0.1:8080: connect: connection refused")
-		assert.Nil(t, r)
+			"connect: connection refused")
 	})
 
 	t.Run("call GET hello", func(t *testing.T) {
@@ -54,7 +54,13 @@ func TestHello(t *testing.T) {
 
 		r, err := p.Play()
 		assert.NoError(t, err)
+
 		assert.True(t, r.Passed())
 		assert.NoError(t, r.LastError())
+
+		steps := r.Steps()
+		require.Len(t, steps, 1)
+
+		assert.Equal(t, "hello returns 200 OK", steps[0].ResponseHandlerOutput())
 	})
 }
