@@ -18,8 +18,7 @@ type execStep struct {
 	step step // Definition of a step.
 	req  *http.Request
 	res  *http.Response
-	rho  string // The statndart output of response handler.
-	rhe  string //
+	rho  string // The output of response handler.
 }
 
 func (e execStep) ResponseHandlerOutput() string {
@@ -60,6 +59,15 @@ func (p *Player) Play() (Report, error) {
 		item.res, err = cl.Do(item.req)
 		if err != nil {
 			return report, err
+		}
+		if step.responseHandler != nil {
+			r := results{}
+			output, err := executeResponseHandler(step.responseHandler.content, nil, *item.res, &r)
+			if err != nil {
+				// TODO: add item to report?
+				return report, err
+			}
+			item.rho = output
 		}
 		report.steps = append(report.steps, item)
 	}
