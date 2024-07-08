@@ -3,12 +3,12 @@ package hello
 import (
 	"context"
 	"errors"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/strotz/goplaycalls/gpc"
 )
 
@@ -20,10 +20,10 @@ func TestHello(t *testing.T) {
 	}
 
 	t.Run("call GET hello without server", func(t *testing.T) {
-		r := p.Play()
-		assert.NotNil(t, r)
-		assert.False(t, r.Passed())
-		assert.EqualError(t, r.LastError(), "Connection refused: localhost/[0:0:0:0:0:0:0:1]:8080")
+		r, err := p.Play()
+		require.ErrorContains(t, err,
+			"Get \"http://localhost:8080/hello\": dial tcp 127.0.0.1:8080: connect: connection refused")
+		assert.Nil(t, r)
 	})
 
 	t.Run("call GET hello", func(t *testing.T) {
@@ -34,7 +34,7 @@ func TestHello(t *testing.T) {
 			// TODO: this is empty function, add something interesting for hello
 		})
 		s := http.Server{
-			Addr:    "localhost:8080",
+			Addr:    ":8080",
 			Handler: sm,
 		}
 		var wg sync.WaitGroup
@@ -52,10 +52,9 @@ func TestHello(t *testing.T) {
 			require.NoError(t, err)
 		}()
 
-		r := p.Play()
+		r, err := p.Play()
 		assert.NoError(t, err)
 		assert.True(t, r.Passed())
 		assert.NoError(t, r.LastError())
-		//"HTTP/1.1 200 OK\nDate: Thu, 04 Jul 2024 22:51:18 GMT\nContent-Length: 0\n\n<Response body is empty>\n"
 	})
 }

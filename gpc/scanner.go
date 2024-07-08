@@ -5,26 +5,26 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"strings"
 )
 
 // Implement parsing of .http files
-// It is somewhat inspired by
-
-type token int
 
 // Ignore
 // RequestSeparator Comment
 // Verb URL
-// EOF
+
+const spaceChars = " \t\r\n"
+const lineEnds = "\r\n"
+
+type token int
 
 const (
 	tokenError token = iota
-	tokenEOF
 
+	tokenRequestSeparator
 	tokenVerb
-	tokenComment
-
 	tokenURL
 )
 
@@ -39,79 +39,17 @@ func (i item) String() string {
 	switch i.tok {
 	case tokenError:
 		return fmt.Sprintf("error: %v", i.val)
-	case tokenEOF:
-		return "EOF"
 	default:
 		return i.val
 	}
 }
 
-//// lexer holds the state of the scanner
-//type lexer struct {
-//	name  string    // used only for error reports.
-//	input string    // the string being scanned.
-//	start int       // start position of the item.
-//	pos   int       // current position in the input.
-//	width int       // width of the last rune read.
-//	items chan item // channel of scanned items.
-//}
-//
-//func lex(name, input string) *lexer {
-//	l := &lexer{
-//		name:  name,
-//		input: input,
-//		items: make(chan item),
-//	}
-//	go l.run()
-//	return l // l.items
-//}
-//
-//func (l *lexer) run() {
-//	for state := lexText; state != nil; {
-//		state = state(l)
-//	}
-//	close(l.items) // no more tokens
-//}
-//
-//func (l *lexer) emit(t token) {
-//	l.items <- item{t, l.input[l.start:l.pos]}
-//	l.start = l.pos
-//}
-//
-//
-//func lexText(l *lexer) stateFn {
-//	for {
-//		if strings.HasPrefix(l.input[l.pos:], leftMeta) {
-//			if l.pos > l.start {
-//				l.emit(tokenText)
-//			}
-//			return lexLeftMeta // next state
-//		}
-//		if l.next() == eof {
-//			break
-//		}
-//	}
-//	// reach eof
-//	if l.pos >= len(l.input) {
-//		l.emit(tokenText)
-//	}
-//	l.emit(tokenEOF)
-//	return nil
-//}
-//
-//func lexLeftMeta(l *lexer) stateFn {
-//	l.pos += len(leftMeta)
-//	l.emit(tokenLeftMeta)
-//	return lexInsideAction // inside {{}}
-//}
-
 var eof = rune(0)
-var eol = rune('\n')
 
 type scanner struct {
 	reader       *bufio.Reader
-	items        chan item
-	currentValue string
+	items        []item
+	currentValue strings.Builder
 }
 
 // stateFn scans input while tracking the lexer state and returns state function that tracks the next state.
@@ -120,10 +58,12 @@ type stateFn func(scanner *scanner) stateFn
 // newScanner returns a new scanner
 func newScanner(reader io.Reader) *scanner {
 	return &scanner{
-		reader:       bufio.NewReader(reader),
-		items:        make(chan item),
-		currentValue: "",
+		reader: bufio.NewReader(reader),
 	}
+}
+
+func (s *scanner) emitItem(it item) {
+	s.items = append(s.items, it)
 }
 
 // read returns the next rune from the input. It returns rune eof when input is over
@@ -154,70 +94,125 @@ func (s *scanner) peak() rune {
 	return r
 }
 
-func (s *scanner) accept(valid string) bool {
+type acceptFn func(r rune) bool
+
+func (s *scanner) accept(fn acceptFn) bool {
 	ch := s.read()
-	if strings.ContainsRune(valid, ch) {
-		s.currentValue += string(ch)
+	if ch == eof {
+		return false
+	}
+	if fn(ch) {
+		s.currentValue.WriteRune(ch)
 		return true
 	}
-	if ch != eof {
-		s.unread()
-	}
+	s.unread()
 	return false
 }
 
 // ignoreWhiteSpaces accumulates spaces and EOL
 func (s *scanner) ignoreWhiteSpaces() {
 	for {
-		if !s.accept(" \t\r\n") {
+		// Collect all white space characters.
+		if !s.accept(func(r rune) bool {
+			return strings.ContainsRune(spaceChars, r)
+		}) {
 			break
 		}
 	}
-	s.currentValue = ""
+	s.currentValue.Reset()
+}
+
+// acceptWord collects one word of characters in currentValue
+func (s *scanner) acceptWord() {
+	for {
+		// Collect everything, except white spaces.
+		if !s.accept(func(r rune) bool {
+			return !strings.ContainsRune(spaceChars, r)
+		}) {
+			break
+		}
+	}
+}
+
+func (s *scanner) acceptLine() {
+	for {
+		// Collect everything until EOL, including spaces.
+		if !s.accept(func(r rune) bool {
+			return !strings.ContainsRune(lineEnds, r)
+		}) {
+			break
+		}
+	}
+}
+
+func (s *scanner) emitError() {
+	s.emitItem(item{
+		tok: tokenError,
+		val: s.currentValue.String(),
+	})
+	s.currentValue.Reset()
 }
 
 // lexIgnore skips whitespaces in the beginning or end of the file. Does not emit.
 func lexIgnore(s *scanner) stateFn {
 	s.ignoreWhiteSpaces()
+	if s.peak() == eof {
+		return nil
+	}
 	return lexDetectRequest
 }
 
-// lexDetectRequest detects next token and returns proper stateFn. Does not emit.
+// lexDetectRequest detects next token and returns proper stateFn. Could emit an error.
 func lexDetectRequest(s *scanner) stateFn {
 	// looking for request separator or verb
+	s.acceptWord()
+	switch s.currentValue.String() {
+	case requestSeparator:
+		s.currentValue.Reset()
+		return lexRequestSeparator
+	case http.MethodGet:
+		s.emitItem(item{
+			tok: tokenVerb,
+			val: http.MethodGet,
+		})
+		s.currentValue.Reset()
+		return lexRequestUrl
+	}
+	s.emitError()
 	return nil
 }
 
+// lexRequestSeparator detects the name of the request
 func lexRequestSeparator(s *scanner) stateFn {
-	return nil
+	// collect everything until the end of the line
+	s.acceptLine()
+	val := strings.TrimSpace(s.currentValue.String())
+	if len(val) > 0 {
+		s.emitItem(item{
+			tok: tokenRequestSeparator,
+			val: val,
+		})
+		s.currentValue.Reset()
+	}
+	return lexIgnore
 }
 
-//func (s *scanner) scan() (item, error) {
-//	ch := s.read()
-//	log.Println("Char:", string(ch))
-//	if ch == readError {
-//		return item{
-//			tok: tokenError,
-//			val: "",
-//		}, err
-//	}
-//	switch ch {
-//	case eol:
-//		return item{tok: tokenEOL, val: ""}, nil
-//	case eof:
-//		return item{tok: tokenEOF, val: ""}, nil
-//	default:
-//		return item{tok: tokenError, val: string(ch)}, fmt.Errorf("unknown token: %v, error: %w", ch, err)
-//	}
-//}
-//
-//func (s *scanner) scanAll() ([]item, error) {
-//	var res []item
-//	for {
-//		it, err := s.scan()
-//		res = append(res, it)
-//		if err != nil || it.tok == tokenError || it.tok == tokenEOF {
-//			return res, err
-//		}
-//	}
-//}
+// lexRequestUrl emits the URL
+func lexRequestUrl(s *scanner) stateFn {
+	s.ignoreWhiteSpaces()
+	s.acceptWord()
+	if s.currentValue.Len() > 0 {
+		s.emitItem(item{
+			tok: tokenURL,
+			val: s.currentValue.String(),
+		})
+		s.currentValue.Reset()
+	}
+	return lexIgnore
+}
+
+func (s *scanner) scan() {
+	for state := lexIgnore; state != nil; {
+		state = state(s)
+	}
+}
