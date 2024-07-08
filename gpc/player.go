@@ -15,10 +15,11 @@ type Player struct {
 }
 
 type execStep struct {
-	step step // Definition of step.
+	step step // Definition of a step.
 	req  *http.Request
 	res  *http.Response
-	rho  string // The output of response handler.
+	rho  string // The statndart output of response handler.
+	rhe  string //
 }
 
 func (e execStep) ResponseHandlerOutput() string {

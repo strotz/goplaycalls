@@ -1,12 +1,12 @@
 package gpc
 
 import (
-	"github.com/stretchr/testify/require"
 	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func assertFunc(t *testing.T, expected any, given any) bool {
