@@ -1,6 +1,7 @@
 package gpc
 
 import (
+	"io"
 	"net/http"
 	"strings"
 
@@ -21,14 +22,15 @@ type scriptOutput struct {
 
 func (s *scriptOutput) Log(message string) {
 	s.content.WriteString(message)
+	s.content.WriteRune('\n')
 }
 
 func (s *scriptOutput) Warn(message string) {
-	s.content.WriteString(message)
+	s.Log(message)
 }
 
 func (s *scriptOutput) Error(message string) {
-	s.content.WriteString(message)
+	s.Log(message)
 }
 
 func (s *scriptOutput) Output() string {
@@ -36,7 +38,8 @@ func (s *scriptOutput) Output() string {
 }
 
 type ResponseAdapter struct {
-	Status string `json:"status"`
+	Status int    `json:"status"`
+	Body   string `json:"body"`
 }
 
 func executeResponseHandler(source string, env *playEnvironment, response http.Response, out *results) (string, error) {
@@ -51,8 +54,22 @@ func executeResponseHandler(source string, env *playEnvironment, response http.R
 	registry.RegisterNativeModule(console.ModuleName, console.RequireWithPrinter(printer))
 	console.Enable(vm)
 
-	err := vm.Set("response", ResponseAdapter{
-		Status: response.Status,
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return "", err
+	}
+	defer response.Body.Close()
+
+	// TODO: it seems like httpclient tool detects json output and formats it
+	//b, err := httputil.DumpResponse(&response, true)
+	//if err != nil {
+	//	log.Fatalln(err)
+	//}
+	//log.Println(string(b))
+
+	err = vm.Set("response", ResponseAdapter{
+		Status: response.StatusCode,
+		Body:   string(body),
 	})
 	if err != nil {
 		return "", err
