@@ -23,7 +23,7 @@ const Client = {
         // Exit VM
     },
     runTests(response){
-        let passed = true;
+        const failures = [];
         if (this._tests) {
             for (const t of this._tests) {
                 this.log(`RUN: ${t.testName}`);
@@ -33,15 +33,13 @@ const Client = {
                 } catch (e) {
                     this.log(`FAILED: ${t.testName}`);
                     this.log(e.toString());
-                    passed = false;
+                    failures.push(e);
                 }
             }
         }
-        if (passed === false) {
-            throw new Error("Test failed.");
-        }
+        return failures;
     },
-    // TODO: global kept across all sessions/VMs
+    // TODO: globals kept across all sessions/VMs
 };
 
 const client = Object.create(Client);

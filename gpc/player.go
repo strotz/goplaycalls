@@ -18,11 +18,20 @@ type execStep struct {
 	step step // Definition of a step.
 	req  *http.Request
 	res  *http.Response
-	rho  string // The output of response handler.
+
+	rhResult executeResult
 }
 
 func (e execStep) ResponseHandlerOutput() string {
-	return e.rho
+	return e.rhResult.console
+}
+
+func (e execStep) ResponseHandlerTestErrors() []string {
+	return e.rhResult.failures
+}
+
+func (e execStep) Failed() bool {
+	return len(e.rhResult.failures) > 0
 }
 
 type Report struct {
@@ -31,6 +40,15 @@ type Report struct {
 
 func (r Report) Steps() []execStep {
 	return r.steps
+}
+
+func (r Report) TestFailed() bool {
+	for _, step := range r.steps {
+		if step.Failed() {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *Player) Play() (Report, error) {
@@ -54,12 +72,11 @@ func (p *Player) Play() (Report, error) {
 		}
 		if step.responseHandler != nil {
 			r := results{}
-			output, err := executeResponseHandler(step.responseHandler.content, nil, *item.res, &r)
+			item.rhResult, err = executeResponseHandler(step.responseHandler.content, nil, *item.res, &r)
 			if err != nil {
 				// TODO: add item to report?
 				return report, err
 			}
-			item.rho = output
 		}
 		report.steps = append(report.steps, item)
 	}

@@ -52,6 +52,7 @@ func TestHello(t *testing.T) {
 
 		r, err := p.Play()
 		assert.NoError(t, err)
+		assert.True(t, r.TestFailed())
 
 		steps := r.Steps()
 		require.Len(t, steps, 1)
@@ -60,6 +61,14 @@ func TestHello(t *testing.T) {
 name: {"name":"Double Belomor"}
 RUN: Request executed successfully
 PASS: Request executed successfully
+RUN: Failed test
+FAILED: Failed test
+Error: Name has to be Hello, but got Double Belomor
 `, steps[0].ResponseHandlerOutput())
+
+		assert.True(t, steps[0].Failed())
+		assert.Equal(t, []string{
+			"Error: Name has to be Hello, but got Double Belomor",
+		}, steps[0].ResponseHandlerTestErrors())
 	})
 }

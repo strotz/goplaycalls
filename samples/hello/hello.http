@@ -8,4 +8,9 @@ GET http://localhost:8080/hello
     client.test("Request executed successfully", function() {
         client.assert(response.status === 200, "Response status is not 200");
     });
+
+    client.test("Failed test", function () {
+        const r = JSON.parse(response.body)
+        client.assert(r.name === "Hello", `Name has to be Hello, but got ${r.name}`)
+    })
 %}
