@@ -21,14 +21,8 @@ jobs:
       with:
         go-version: '1.22.4'
 
-    - name: Build librarly
-      run: go build -v ./gpc/...
+    - name: Build library
+      run: go build -v ./...
 
     - name: Test library
-      run: go test -v ./gpc/...
-
-    - name: Test samples
-      run: go test -v ./samples/hello/... 
-
-    - name: Build demo server
-      run: go build -v ./samples/cli
+      run: go test -v ./...
