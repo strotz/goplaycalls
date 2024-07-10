@@ -58,6 +58,8 @@ func TestHello(t *testing.T) {
 
 		assert.Equal(t, `hello status: 200
 name: {"name":"Double Belomor"}
+RUN: Request executed successfully
+PASS: Request executed successfully
 `, steps[0].ResponseHandlerOutput())
 	})
 }

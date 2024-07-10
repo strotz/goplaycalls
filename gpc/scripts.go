@@ -1,6 +1,7 @@
 package gpc
 
 import (
+	_ "embed"
 	"io"
 	"net/http"
 	"strings"
@@ -9,6 +10,9 @@ import (
 	"github.com/dop251/goja_nodejs/console"
 	"github.com/dop251/goja_nodejs/require"
 )
+
+//go:embed client.js
+var clientSource string
 
 type playEnvironment struct{}
 
@@ -54,28 +58,35 @@ func executeResponseHandler(source string, env *playEnvironment, response http.R
 	registry.RegisterNativeModule(console.ModuleName, console.RequireWithPrinter(printer))
 	console.Enable(vm)
 
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		return "", err
-	}
-	defer response.Body.Close()
-
-	// TODO: it seems like httpclient tool detects json output and formats it
-	//b, err := httputil.DumpResponse(&response, true)
-	//if err != nil {
-	//	log.Fatalln(err)
-	//}
-	//log.Println(string(b))
-
-	err = vm.Set("response", ResponseAdapter{
+	r := ResponseAdapter{
 		Status: response.StatusCode,
-		Body:   string(body),
-	})
+	}
+	if response.Body != nil {
+		body, err := io.ReadAll(response.Body)
+		if err != nil {
+			return "", err
+		}
+		defer response.Body.Close()
+		// TODO: it seems like httpclient tool detects json output and formats it. See httputil.DumpResponse(&response, true)
+		r.Body = string(body)
+	}
+
+	err := vm.Set("response", r)
 	if err != nil {
 		return "", err
 	}
 
+	// TODO: verify proper client initialization, at least no errors
+	_, err = vm.RunString(clientSource)
+	if err != nil {
+		return printer.Output(), err
+	}
 	out.value, err = vm.RunString(source)
+	if err != nil {
+		return printer.Output(), err
+	}
+
+	_, err = vm.RunString("client.runTests()")
 	if err != nil {
 		return printer.Output(), err
 	}
