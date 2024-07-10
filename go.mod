@@ -1,4 +1,4 @@
-module github.com/strotz/goplaycalls/gpc
+module github.com/strotz/goplaycalls
 
 go 1.22.4
 
