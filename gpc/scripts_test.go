@@ -16,7 +16,7 @@ func TestHelloWorld(t *testing.T) {
 	result := results{}
 	output, err := executeResponseHandler("console.log('Hello World', response.status)", nil, resp, &result)
 	require.NoError(t, err)
-	require.Equal(t, "Hello World 200\n", output)
+	require.Equal(t, "Hello World 200\n", output.console)
 }
 
 func TestClient(t *testing.T) {
@@ -33,7 +33,7 @@ func TestClient(t *testing.T) {
 		result := results{}
 		output, err := executeResponseHandler("client.log(`Hello ${client.name}`)", nil, resp, &result)
 		require.NoError(t, err)
-		require.Equal(t, "Hello HTTP Client\n", output)
+		require.Equal(t, "Hello HTTP Client\n", output.console)
 	})
 
 	t.Run("add and run passing test", func(t *testing.T) {
@@ -45,7 +45,7 @@ func TestClient(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, `RUN: first
 PASS: first
-`, output)
+`, output.console)
 	})
 
 	t.Run("add and run failing test", func(t *testing.T) {
@@ -54,10 +54,12 @@ PASS: first
 		}
 		result := results{}
 		output, err := executeResponseHandler("client.test('second', function() {client.assert(response.status === 200, \"Response status is not 200\");})", nil, resp, &result)
-		require.ErrorContains(t, err, "Test failed")
+		require.NoError(t, err)
 		require.Equal(t, `RUN: second
 FAILED: second
 Error: Response status is not 200
-`, output)
+`, output.console)
+		require.Len(t, output.failures, 1)
+		assert.Equal(t, output.failures[0], "Error: Response status is not 200")
 	})
 }

@@ -46,8 +46,17 @@ type ResponseAdapter struct {
 	Body   string `json:"body"`
 }
 
-func executeResponseHandler(source string, env *playEnvironment, response http.Response, out *results) (string, error) {
+type executeResult struct {
+	console  string
+	failures []string
+}
+
+// executeResponseHandler executes response handler and returns the result of test execution along with console output.
+func executeResponseHandler(source string, env *playEnvironment, response http.Response, out *results) (result executeResult, err error) {
 	printer := &scriptOutput{}
+	defer func() {
+		result.console = printer.Output()
+	}()
 
 	registry := new(require.Registry) // this can be shared by multiple runtimes
 
@@ -62,33 +71,36 @@ func executeResponseHandler(source string, env *playEnvironment, response http.R
 		Status: response.StatusCode,
 	}
 	if response.Body != nil {
-		body, err := io.ReadAll(response.Body)
+		var body []byte
+		body, err = io.ReadAll(response.Body)
 		if err != nil {
-			return "", err
+			return
 		}
 		defer response.Body.Close()
 		// TODO: it seems like httpclient tool detects json output and formats it. See httputil.DumpResponse(&response, true)
 		r.Body = string(body)
 	}
-
-	err := vm.Set("response", r)
+	err = vm.Set("response", r)
 	if err != nil {
-		return "", err
+		return
 	}
 
 	// TODO: verify proper client initialization, at least no errors
 	_, err = vm.RunString(clientSource)
 	if err != nil {
-		return printer.Output(), err
+		return
 	}
 	out.value, err = vm.RunString(source)
 	if err != nil {
-		return printer.Output(), err
+		return
 	}
 
-	_, err = vm.RunString("client.runTests()")
-	if err != nil {
-		return printer.Output(), err
+	// Run declared tests and process the results.
+	testResult, err := vm.RunString("client.runTests()")
+	ex := testResult.ToObject(vm)
+	for _, key := range ex.Keys() {
+		// TODO: it is slightly hacky, need to make strict abstraction
+		result.failures = append(result.failures, ex.Get(key).String())
 	}
-	return printer.Output(), nil
+	return
 }
