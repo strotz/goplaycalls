@@ -29,3 +29,6 @@ jobs:
 
     - name: Test samples
       run: go test -v ./samples/hello/... 
+
+    - name: Build demo server
+      run: go build -v ./samples/cli

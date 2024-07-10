@@ -33,14 +33,6 @@ func (r Report) Steps() []execStep {
 	return r.steps
 }
 
-func (r Report) Passed() bool {
-	return true
-}
-
-func (r Report) LastError() error {
-	return nil
-}
-
 func (p *Player) Play() (Report, error) {
 	report := Report{}
 	cl := &http.Client{}

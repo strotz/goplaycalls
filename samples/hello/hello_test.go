@@ -30,9 +30,7 @@ func TestHello(t *testing.T) {
 		// Start test server
 		// TODO: make it reusable
 		sm := http.NewServeMux()
-		sm.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
-			// TODO: this is empty function, add something interesting for hello
-		})
+		sm.HandleFunc("/hello", Handler)
 		s := http.Server{
 			Addr:    ":8080",
 			Handler: sm,
@@ -55,12 +53,13 @@ func TestHello(t *testing.T) {
 		r, err := p.Play()
 		assert.NoError(t, err)
 
-		assert.True(t, r.Passed())
-		assert.NoError(t, r.LastError())
-
 		steps := r.Steps()
 		require.Len(t, steps, 1)
 
-		assert.Equal(t, "hello returns 200 OK", steps[0].ResponseHandlerOutput())
+		assert.Equal(t, `hello status: 200
+name: {"name":"Double Belomor"}
+RUN: Request executed successfully
+PASS: Request executed successfully
+`, steps[0].ResponseHandlerOutput())
 	})
 }
