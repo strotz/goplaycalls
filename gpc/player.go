@@ -7,6 +7,9 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/strotz/goplaycalls/pipes"
 )
@@ -114,4 +117,26 @@ func newPlayer(r io.Reader) (*Player, error) {
 	return &Player{
 		steps: steps,
 	}, nil
+}
+
+func RunTests(filePath string, t *testing.T) Report {
+	p, err := ParseFile(filePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	report, err := p.Play()
+	assert.NoError(t, err)
+	// TODO: output in one of the common formats
+	// TODO:extract stack trace and make line:pos real
+	if report.TestFailed() {
+		for _, step := range report.Steps() {
+			t.Logf("test console:\n%s", step.ResponseHandlerOutput())
+			f := step.ResponseHandlerTestErrors()
+			for _, failure := range f {
+				t.Logf("failure:\n%s", failure)
+			}
+		}
+		assert.Fail(t, "at least one test failed")
+	}
+	return report
 }
