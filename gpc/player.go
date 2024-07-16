@@ -7,11 +7,14 @@ import (
 	"net/url"
 	"os"
 	"strings"
+
+	"github.com/strotz/goplaycalls/pipes"
 )
 
 type Player struct {
 	steps  []step
 	report Report
+	Dialer pipes.DialerFunc
 }
 
 type execStep struct {
@@ -54,6 +57,11 @@ func (r Report) TestFailed() bool {
 func (p *Player) Play() (Report, error) {
 	report := Report{}
 	cl := &http.Client{}
+	if p.Dialer != nil {
+		cl.Transport = &http.Transport{
+			DialContext: p.Dialer,
+		}
+	}
 	for _, step := range p.steps {
 		item := execStep{
 			step: step,
