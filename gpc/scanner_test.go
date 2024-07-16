@@ -217,6 +217,52 @@ GET https://example.com
 		assert.EqualValues(t, expected, s.items)
 	})
 
+	t.Run("scan typical PUT", func(t *testing.T) {
+		r := strings.NewReader(`### Put operation
+PUT https://example.com
+		`)
+		s := newScanner(r)
+		s.scan()
+		expected := []item{
+			{
+				tok: tokenRequestSeparator,
+				val: "Put operation",
+			},
+			{
+				tok: tokenVerb,
+				val: "PUT",
+			},
+			{
+				tok: tokenURL,
+				val: "https://example.com",
+			},
+		}
+		assert.EqualValues(t, expected, s.items)
+	})
+
+	t.Run("scan typical delete", func(t *testing.T) {
+		r := strings.NewReader(`### Delete operation
+DELETE https://example.com
+		`)
+		s := newScanner(r)
+		s.scan()
+		expected := []item{
+			{
+				tok: tokenRequestSeparator,
+				val: "Delete operation",
+			},
+			{
+				tok: tokenVerb,
+				val: "DELETE",
+			},
+			{
+				tok: tokenURL,
+				val: "https://example.com",
+			},
+		}
+		assert.EqualValues(t, expected, s.items)
+	})
+
 	t.Run("scan get with request handler", func(t *testing.T) {
 		r := strings.NewReader(`### Get operation
 GET https://example.com
