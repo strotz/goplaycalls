@@ -1,16 +1,15 @@
 package hello
 
 import (
-	"context"
-	"errors"
 	"net/http"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/strotz/goplaycalls/gpc"
+	"github.com/strotz/goplaycalls/pipes"
+	"github.com/strotz/goplaycalls/testserver"
 )
 
 // Checks HTTP GET call to the server.
@@ -27,29 +26,11 @@ func TestHello(t *testing.T) {
 	})
 
 	t.Run("call GET hello", func(t *testing.T) {
-		// Start test server
-		// TODO: make it reusable
-		sm := http.NewServeMux()
-		sm.HandleFunc("/hello", Handler)
-		s := http.Server{
-			Addr:    ":8080",
-			Handler: sm,
-		}
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			wg.Done()
-			err := s.ListenAndServe()
-			if err != nil && !errors.Is(err, http.ErrServerClosed) {
-				require.NoError(t, err)
-			}
-		}()
-		wg.Wait()
-		defer func() {
-			err := s.Shutdown(context.Background())
-			require.NoError(t, err)
-		}()
+		ts := testserver.NewTestServer(t.Name(), http.MethodGet, "/hello", Handler)
+		ts.Start()
+		t.Cleanup(ts.Stop)
 
+		p.Dialer = pipes.CreateDialer(t.Name())
 		r, err := p.Play()
 		assert.NoError(t, err)
 		assert.True(t, r.TestFailed())

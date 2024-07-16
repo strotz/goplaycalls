@@ -7,11 +7,17 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/strotz/goplaycalls/pipes"
 )
 
 type Player struct {
 	steps  []step
 	report Report
+	Dialer pipes.DialerFunc
 }
 
 type execStep struct {
@@ -54,6 +60,11 @@ func (r Report) TestFailed() bool {
 func (p *Player) Play() (Report, error) {
 	report := Report{}
 	cl := &http.Client{}
+	if p.Dialer != nil {
+		cl.Transport = &http.Transport{
+			DialContext: p.Dialer,
+		}
+	}
 	for _, step := range p.steps {
 		item := execStep{
 			step: step,
@@ -106,4 +117,26 @@ func newPlayer(r io.Reader) (*Player, error) {
 	return &Player{
 		steps: steps,
 	}, nil
+}
+
+func RunTests(filePath string, t *testing.T) Report {
+	p, err := ParseFile(filePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	report, err := p.Play()
+	assert.NoError(t, err)
+	// TODO: output in one of the common formats
+	// TODO:extract stack trace and make line:pos real
+	if report.TestFailed() {
+		for _, step := range report.Steps() {
+			t.Logf("test console:\n%s", step.ResponseHandlerOutput())
+			f := step.ResponseHandlerTestErrors()
+			for _, failure := range f {
+				t.Logf("failure:\n%s", failure)
+			}
+		}
+		assert.Fail(t, "at least one test failed")
+	}
+	return report
 }

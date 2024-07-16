@@ -78,7 +78,7 @@ func (s *scanner) emitItem(it item) {
 }
 
 // read returns the next rune from the input. It returns rune eof when input is over
-// or readError when other error.
+// or readError when another error.
 func (s *scanner) read() rune {
 	r, _, err := s.reader.ReadRune()
 	if err != nil {
@@ -192,6 +192,24 @@ func lexDetectRequest(s *scanner) stateFn {
 			val: http.MethodGet,
 		})
 		s.currentValue.Reset()
+		return lexRequestUrl
+	case http.MethodPut:
+		s.emitItem(item{
+			tok: tokenVerb,
+			val: http.MethodPut,
+		})
+		return lexRequestUrl
+	case http.MethodPost:
+		s.emitItem(item{
+			tok: tokenVerb,
+			val: http.MethodPost,
+		})
+		return lexRequestUrl
+	case http.MethodDelete:
+		s.emitItem(item{
+			tok: tokenVerb,
+			val: http.MethodDelete,
+		})
 		return lexRequestUrl
 	case responseHandlerStart:
 		s.emitItem(item{
